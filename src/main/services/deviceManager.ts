@@ -37,6 +37,13 @@ export class DeviceManager {
   }
 
   async startDevice(device: DeviceConfig): Promise<void> {
+    const existing = this.handles.get(device.id);
+    if (existing) {
+      existing.stream.stop();
+      if (existing.pollTimer) clearInterval(existing.pollTimer);
+      this.handles.delete(device.id);
+    }
+
     const password = await this.credentials.getPassword(device.passwordRef);
     const client = new HikvisionClient(device, password);
     const health: DeviceHealth = { deviceId: device.id, status: 'disconnected', reconnectCount: 0 };

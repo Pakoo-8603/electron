@@ -10,15 +10,12 @@ import { OutboxSync } from '../services/outboxSync';
 import { DeviceConfig, GatewaySettings } from '../../shared/types';
 
 const configStore = new Store<{ settings: GatewaySettings | null }>({ defaults: { settings: null } });
-const db = new GatewayDatabase();
 const credentials = new CredentialStore();
-const manager = new DeviceManager(db, credentials, () => (configStore.get('settings') as GatewaySettings | null));
-const outbox = new OutboxSync(db, () => (configStore.get('settings') as GatewaySettings | null));
-const listener = new HttpListenerServer(async (payload) => {
-  const defaultDevice = db.getDevices()[0];
-  if (!defaultDevice) return;
-  await manager.ingestRawEvent(defaultDevice.id, payload);
-});
+
+let db: GatewayDatabase;
+let manager: DeviceManager;
+let outbox: OutboxSync;
+let listener: HttpListenerServer;
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -33,8 +30,8 @@ function createWindow(): void {
   });
 
   const devUrl = process.env.VITE_DEV_SERVER_URL;
-  if (devUrl) mainWindow.loadURL(devUrl);
-  else mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'));
+  if (devUrl) void mainWindow.loadURL(devUrl);
+  else void mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'));
 }
 
 function setupTray(): void {
@@ -48,7 +45,13 @@ function setupTray(): void {
     tray?.setContextMenu(
       Menu.buildFromTemplate([
         { label: 'Abrir UI', click: () => mainWindow?.show() },
-        { label: 'Reiniciar conexiones', click: () => void manager.startAll() },
+        {
+          label: 'Reiniciar conexiones',
+          click: () => {
+            manager.stopAll();
+            void manager.startAll();
+          }
+        },
         { label: 'Salir', click: () => app.quit() }
       ])
     );
@@ -60,8 +63,10 @@ function setupTray(): void {
 
 function registerIpc(): void {
   ipcMain.handle('settings:get', () => configStore.get('settings'));
-  ipcMain.handle('settings:set', (_e, settings: GatewaySettings) => {
+  ipcMain.handle('settings:set', async (_e, settings: GatewaySettings) => {
     configStore.set('settings', settings);
+    await listener.stop();
+    await listener.start(settings.listenerPort);
     return true;
   });
 
@@ -69,8 +74,10 @@ function registerIpc(): void {
   ipcMain.handle('devices:save', async (_e, device: Omit<DeviceConfig, 'passwordRef' | 'createdAt'> & { password: string }) => {
     const passwordRef = await credentials.savePassword(device.id, device.password);
     db.upsertDevice({ ...device, passwordRef, createdAt: new Date().toISOString() });
+    await manager.startDevice({ ...device, passwordRef, createdAt: new Date().toISOString() });
     return true;
   });
+
   ipcMain.handle('devices:delete', async (_e, id: string) => {
     const device = db.getDevices().find((d) => d.id === id);
     if (device) await credentials.deletePassword(device.passwordRef);
@@ -84,24 +91,30 @@ function registerIpc(): void {
 
 app.whenReady().then(async () => {
   log.initialize();
+
+  db = await GatewayDatabase.create();
+  manager = new DeviceManager(db, credentials, () => (configStore.get('settings') as GatewaySettings | null));
+  outbox = new OutboxSync(db, () => (configStore.get('settings') as GatewaySettings | null));
+  listener = new HttpListenerServer(async (payload) => {
+    const defaultDevice = db.getDevices()[0];
+    if (!defaultDevice) return;
+    await manager.ingestRawEvent(defaultDevice.id, payload);
+  });
+
   registerIpc();
   createWindow();
   setupTray();
 
   const settings = configStore.get('settings') as GatewaySettings | null;
-  if (settings) {
-    await listener.start(settings.listenerPort);
-  }
+  if (settings) await listener.start(settings.listenerPort);
   await manager.startAll();
   outbox.start();
 });
 
-app.on('window-all-closed', (e) => {
-  e.preventDefault();
-});
+app.on('window-all-closed', (e) => e.preventDefault());
 
 app.on('before-quit', async () => {
-  outbox.stop();
-  manager.stopAll();
-  await listener.stop();
+  outbox?.stop();
+  manager?.stopAll();
+  await listener?.stop();
 });

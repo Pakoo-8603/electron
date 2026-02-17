@@ -1,17 +1,32 @@
 # Hikvision ISAPI Gateway (Electron + TypeScript)
 
-Gateway ligero de sucursal/LAN para dispositivos Hikvision (acceso/facial), con cola local SQLite y sincronización robusta a nube.
+Gateway ligero para sucursal/LAN que integra dispositivos Hikvision (acceso/facial) vía ISAPI, con cola local y sincronización resiliente a nube.
+
+## ⚠️ Versiones de Node soportadas
+
+Este proyecto soporta **Node 20.x o 22.x (LTS)**.
+
+- ✅ Recomendado: `v22`
+- ✅ También soportado: `v20`
+- ❌ No soportado: `v23+` (incluye `v25`, que rompe instalación de toolchain nativo en varios entornos)
+
+Si usas `nvm`:
+
+```bash
+nvm install 22
+nvm use 22
+```
 
 ## Arquitectura
 
 - **Main process (Node/Electron):**
-  - `DeviceManager`: orquestación de conexiones por dispositivo y health.
-  - `AlertStreamClient`: consumo incremental de `multipart/mixed` (modo A pull).
-  - `HttpListenerServer`: receptor `POST /hikvision/events` (modo B push).
-  - `OutboxSync`: envío batch de eventos a nube con reintentos/backoff.
-  - `GatewayDatabase`: persistencia en SQLite (WAL): `devices`, `events`, `outbox`.
+  - `DeviceManager`: orquestación de conexiones y salud por dispositivo.
+  - `AlertStreamClient`: consumo incremental de `multipart/mixed` (`alertStream`).
+  - `HttpListenerServer`: receptor `POST /hikvision/events`.
+  - `OutboxSync`: envío batch con reintentos/backoff y compresión gzip.
+  - `GatewayDatabase` (`sql.js`): persistencia local en archivo SQLite-compatible.
 - **Renderer (React):** wizard, dispositivos, estado, accesos recientes, logs.
-- **Shared:** tipos y contratos comunes.
+- **Shared:** tipos comunes.
 
 ## Estructura
 
@@ -26,13 +41,8 @@ Gateway ligero de sucursal/LAN para dispositivos Hikvision (acceso/facial), con 
 /src/renderer
 /src/shared
 /tests
+/scripts
 ```
-
-## Requisitos
-
-- Node 18+
-- npm 9+
-- Windows recomendado (cross-platform compatible)
 
 ## Desarrollo
 
@@ -41,7 +51,7 @@ npm install
 npm run dev
 ```
 
-## Build y empaquetado
+## Build / empaquetado
 
 ```bash
 npm run build
@@ -50,62 +60,20 @@ npm run package
 
 ## Configuración de dispositivos
 
-### Paso 1: Wizard inicial
-- `tenantId`, `siteId`
-- `backendUrl` (HTTPS)
-- `backendToken`
-- `listenerPort` (para modo B push)
-
-### Paso 2: Dispositivos
-- Campos: `ip/host`, `port`, `http/https`, `username`, `password`, `eventMode`
-- `eventMode`:
-  - `auto` / `alertStream`: usa `GET /ISAPI/Event/notification/alertStream`
-  - `httpPush`: configurar dispositivo para enviar POST a `http://<gateway>:<port>/hikvision/events`
-  - `polling`: fallback por consulta periódica
-
-### Paso 3: Prueba de conectividad
-- `GET /ISAPI/System/deviceInfo` para validar credenciales.
-
-## Modos de evento
-
-### Modo A (pull)
-- Conexión persistente a `alertStream`
-- Parseo incremental por boundary
-- Reconexión automática con backoff + jitter
-- Timeout de heartbeat
-
-### Modo B (push)
-- Listener HTTP local (`/hikvision/events`)
-- Acepta payload XML/JSON como texto
-- Puede ampliarse para multipart con imagen adjunta
-
-### Fallback polling
-- Consulta periódica de eventos
-- Dedupe por `event_id` y ventana temporal
-
-## Seguridad
-
-- Credenciales Hikvision almacenadas en keychain (`keytar`)
-- Password nunca en logs
-- Backend esperado sobre HTTPS
-- Extensible con pinning TLS en cliente HTTP
-
-## Outbox y resiliencia
-
-- SQLite WAL para robustez
-- Outbox con estados `pending/sent/failed`
-- Reintentos exponenciales con `next_retry_at`
-- Batch + compresión gzip al backend
+1. Wizard inicial: `tenantId`, `siteId`, `backendUrl`, `backendToken`, `listenerPort`.
+2. Alta de dispositivo: host/ip, puerto, protocolo, usuario, password, modo.
+3. Modo de eventos:
+   - `alertStream` (pull): `GET /ISAPI/Event/notification/alertStream`
+   - `httpPush` (push): POST al gateway `http://<gateway>:<port>/hikvision/events`
+   - `polling` (fallback)
 
 ## Simulador local
-
-Levanta un mock de Hikvision + backend en puerto 9090.
 
 ```bash
 npm run simulate
 ```
 
-Endpoints mock:
+Levanta mock en `:9090` para:
 - `GET /ISAPI/System/deviceInfo`
 - `GET /ISAPI/Event/notification/alertStream`
 - `POST /gateway/events/batch`
@@ -116,17 +84,24 @@ Endpoints mock:
 npm test
 ```
 
-Incluye unit tests de normalización + dedupe.
-
 ## Troubleshooting
 
-- **401/403 en ISAPI:** revisar usuario/clave y modo de auth Digest/Basic.
-- **Sin eventos en push:** abrir puerto `listenerPort` en firewall local.
-- **No conecta por HTTPS interno:** validar certificados del dispositivo; para pruebas usar HTTP LAN aislada.
-- **Outbox crece y no baja:** revisar reachability al backend y token Bearer.
+### `npm i` falla con `better-sqlite3` / `node-gyp` / `distutils`
+Esta base ya **no usa dependencias nativas** para DB/credenciales, pero si vienes de un lockfile viejo:
 
-## Operación en background
+```bash
+rm -rf node_modules package-lock.json
+npm cache verify
+npm install
+```
 
-- Soporta ejecución minimizada con tray.
-- Auto-arranque al login: usar opciones de startup del SO/Electron.
-- Inicio sin login (Windows): recomendado configurar `Task Scheduler` con permisos de servicio.
+Asegúrate de estar en Node 20/22 LTS.
+
+### `concurrently: command not found`
+Ocurre cuando `npm install` no terminó. Corrige instalación y vuelve a correr `npm run dev`.
+
+### 401/403 en Hikvision
+Validar credenciales, puerto y protocolo HTTP/HTTPS.
+
+### No llegan eventos push
+Abrir `listenerPort` en firewall y confirmar ruta `/hikvision/events`.
