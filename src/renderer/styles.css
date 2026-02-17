@@ -14,3 +14,6 @@ input, select { padding: 8px; }
 .health.gray { background: gray; }
 table { width: 100%; border-collapse: collapse; }
 th, td { border-bottom: 1px solid #ddd; padding: 6px; text-align: left; }
+
+.warning-banner { background: #fff3cd; color: #664d03; border: 1px solid #ffecb5; padding: 10px; border-radius: 6px; margin-bottom: 12px; }
+.error-banner { background: #f8d7da; color: #842029; border: 1px solid #f5c2c7; padding: 10px; border-radius: 6px; margin-bottom: 12px; }

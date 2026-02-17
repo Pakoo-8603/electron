@@ -1,24 +1,42 @@
 import { useEffect, useMemo, useState } from 'react';
+import { gatewayApi, isElectronBridgeAvailable, type GatewayState } from './api';
 
 const tabs = ['Wizard', 'Dispositivos', 'Estado', 'Accesos recientes', 'Logs'] as const;
 
 export const App = () => {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>('Wizard');
-  const [state, setState] = useState<any>(null);
-  const [deviceForm, setDeviceForm] = useState({ name: '', ip: '', port: 80, protocol: 'http', username: '', password: '', mode: 'auto', enabled: true });
+  const [state, setState] = useState<GatewayState | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [deviceForm, setDeviceForm] = useState({
+    name: '',
+    ip: '',
+    port: 80,
+    protocol: 'http',
+    username: '',
+    password: '',
+    mode: 'auto',
+    enabled: true
+  });
 
-  const refresh = async () => setState(await window.gatewayApi.getState());
+  const refresh = async () => {
+    try {
+      setState(await gatewayApi.getState());
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
 
   useEffect(() => {
     refresh();
-    const t = setInterval(refresh, 5000);
-    return () => clearInterval(t);
+    const timer = setInterval(refresh, 5000);
+    return () => clearInterval(timer);
   }, []);
 
   const healthColor = useMemo(() => {
     if (!state) return 'gray';
     if ((state.queueDepth ?? 0) > 100) return 'red';
-    if ((state.statuses ?? []).some((s: any) => !s.connected)) return 'orange';
+    if ((state.statuses ?? []).some((entry) => !entry.connected)) return 'orange';
     return 'green';
   }, [state]);
 
@@ -28,10 +46,20 @@ export const App = () => {
         <h1>Gateway Hikvision</h1>
         <div className={`health ${healthColor}`}>Salud</div>
         {tabs.map((tab) => (
-          <button key={tab} onClick={() => setActiveTab(tab)} className={activeTab === tab ? 'active' : ''}>{tab}</button>
+          <button key={tab} onClick={() => setActiveTab(tab)} className={activeTab === tab ? 'active' : ''}>
+            {tab}
+          </button>
         ))}
       </aside>
       <main>
+        {!isElectronBridgeAvailable() && (
+          <div className="warning-banner">
+            Ejecutando en navegador sin bridge IPC de Electron. Se habilitó un mock local para evitar fallos de `window.gatewayApi`.
+          </div>
+        )}
+
+        {error && <div className="error-banner">Error: {error}</div>}
+
         {activeTab === 'Wizard' && state?.settings && (
           <section>
             <h2>Configuración inicial</h2>
@@ -43,18 +71,59 @@ export const App = () => {
         {activeTab === 'Dispositivos' && (
           <section>
             <h2>Dispositivos</h2>
-            <form onSubmit={async (e) => { e.preventDefault(); await window.gatewayApi.upsertDevice(deviceForm); await refresh(); }}>
-              <input placeholder="Nombre" value={deviceForm.name} onChange={(e) => setDeviceForm({ ...deviceForm, name: e.target.value })} required />
-              <input placeholder="IP" value={deviceForm.ip} onChange={(e) => setDeviceForm({ ...deviceForm, ip: e.target.value })} required />
-              <input type="number" placeholder="Puerto" value={deviceForm.port} onChange={(e) => setDeviceForm({ ...deviceForm, port: Number(e.target.value) })} required />
-              <select value={deviceForm.protocol} onChange={(e) => setDeviceForm({ ...deviceForm, protocol: e.target.value })}><option>http</option><option>https</option></select>
-              <input placeholder="Usuario" value={deviceForm.username} onChange={(e) => setDeviceForm({ ...deviceForm, username: e.target.value })} required />
-              <input type="password" placeholder="Password" value={deviceForm.password} onChange={(e) => setDeviceForm({ ...deviceForm, password: e.target.value })} required />
-              <select value={deviceForm.mode} onChange={(e) => setDeviceForm({ ...deviceForm, mode: e.target.value })}><option>auto</option><option>alertStream</option><option>httpPush</option><option>polling</option></select>
+            <form
+              onSubmit={async (event) => {
+                event.preventDefault();
+                try {
+                  await gatewayApi.upsertDevice(deviceForm as any);
+                  await refresh();
+                  setDeviceForm({
+                    ...deviceForm,
+                    name: '',
+                    ip: '',
+                    username: '',
+                    password: ''
+                  });
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : String(err));
+                }
+              }}
+            >
+              <input placeholder="Nombre" value={deviceForm.name} onChange={(event) => setDeviceForm({ ...deviceForm, name: event.target.value })} required />
+              <input placeholder="IP" value={deviceForm.ip} onChange={(event) => setDeviceForm({ ...deviceForm, ip: event.target.value })} required />
+              <input
+                type="number"
+                placeholder="Puerto"
+                value={deviceForm.port}
+                onChange={(event) => setDeviceForm({ ...deviceForm, port: Number(event.target.value) })}
+                required
+              />
+              <select value={deviceForm.protocol} onChange={(event) => setDeviceForm({ ...deviceForm, protocol: event.target.value })}>
+                <option>http</option>
+                <option>https</option>
+              </select>
+              <input placeholder="Usuario" value={deviceForm.username} onChange={(event) => setDeviceForm({ ...deviceForm, username: event.target.value })} required />
+              <input
+                type="password"
+                placeholder="Password"
+                value={deviceForm.password}
+                onChange={(event) => setDeviceForm({ ...deviceForm, password: event.target.value })}
+                required
+              />
+              <select value={deviceForm.mode} onChange={(event) => setDeviceForm({ ...deviceForm, mode: event.target.value })}>
+                <option>auto</option>
+                <option>alertStream</option>
+                <option>httpPush</option>
+                <option>polling</option>
+              </select>
               <button type="submit">Guardar</button>
             </form>
             <ul>
-              {(state?.devices ?? []).map((device: any) => <li key={device.id}>{device.name} ({device.ip}) - {device.mode}</li>)}
+              {(state?.devices ?? []).map((device) => (
+                <li key={device.id}>
+                  {device.name} ({device.ip}) - {device.mode}
+                </li>
+              ))}
             </ul>
           </section>
         )}
@@ -65,8 +134,10 @@ export const App = () => {
             <p>Queue: {state?.queueDepth ?? 0}</p>
             <p>Latencia nube: {state?.cloudLatency ?? '-'} ms</p>
             <ul>
-              {(state?.statuses ?? []).map((status: any) => (
-                <li key={status.deviceId}>{status.deviceId}: {status.connected ? 'Connected' : 'Disconnected'} / {status.mode}</li>
+              {(state?.statuses ?? []).map((status) => (
+                <li key={status.deviceId}>
+                  {status.deviceId}: {status.connected ? 'Connected' : 'Disconnected'} / {status.mode}
+                </li>
               ))}
             </ul>
           </section>
@@ -76,10 +147,22 @@ export const App = () => {
           <section>
             <h2>Últimos accesos</h2>
             <table>
-              <thead><tr><th>Hora</th><th>Dispositivo</th><th>Evento</th><th>Persona</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>Hora</th>
+                  <th>Dispositivo</th>
+                  <th>Evento</th>
+                  <th>Persona</th>
+                </tr>
+              </thead>
               <tbody>
-                {(state?.recentEvents ?? []).map((event: any) => (
-                  <tr key={event.eventId}><td>{event.timestampGateway}</td><td>{event.deviceId}</td><td>{event.eventType}</td><td>{event.personName ?? event.personId ?? '-'}</td></tr>
+                {(state?.recentEvents ?? []).map((entry) => (
+                  <tr key={entry.eventId}>
+                    <td>{entry.timestampGateway}</td>
+                    <td>{entry.deviceId}</td>
+                    <td>{entry.eventType}</td>
+                    <td>{entry.personName ?? entry.personId ?? '-'}</td>
+                  </tr>
                 ))}
               </tbody>
             </table>
