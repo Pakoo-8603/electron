@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { DeviceConfig, DeviceStatus, GatewaySettings } from '../../shared/types.js';
+import type { DeviceAccessLog, DeviceConfig, DeviceDirectoryUser, DeviceStatus, GatewaySettings } from '../../shared/types.js';
 import { normalizeEvent } from '../../shared/schema.js';
 import { GatewayDatabase } from '../db/database.js';
 import { getDevicePassword, saveDevicePassword } from '../services/secure-store.js';
@@ -55,10 +55,11 @@ export class DeviceManager {
 
   async upsertDevice(input: Omit<DeviceConfig, 'id' | 'createdAt' | 'updatedAt'> & { id?: string; password?: string }) {
     const now = new Date().toISOString();
+    const existing = input.id ? this.db.listDevices().find((entry) => entry.id === input.id) : undefined;
     const device: DeviceConfig = {
       ...input,
       id: input.id ?? randomUUID(),
-      createdAt: now,
+      createdAt: existing?.createdAt ?? now,
       updatedAt: now
     };
     this.db.upsertDevice(device);
@@ -68,18 +69,76 @@ export class DeviceManager {
   }
 
   async testConnection(deviceId: string) {
-    const device = this.db.listDevices().find((entry) => entry.id === deviceId);
-    if (!device) throw new Error('Device not found');
-    const password = await getDevicePassword(deviceId);
-    if (!password) throw new Error('Missing password');
-
-    const baseUrl = `${device.protocol}://${device.ip}:${device.port}`;
+    const { device, password, baseUrl } = await this.getDeviceWithPassword(deviceId);
     const response = await isapiRequest(baseUrl, '/ISAPI/System/deviceInfo', 'GET', {
       username: device.username,
       password
     });
 
     return { ok: response.ok, status: response.status, body: await response.text() };
+  }
+
+  async fetchDeviceUsers(deviceId: string): Promise<DeviceDirectoryUser[]> {
+    const { device, password, baseUrl } = await this.getDeviceWithPassword(deviceId);
+
+    const response = await isapiRequest(
+      baseUrl,
+      '/ISAPI/AccessControl/UserInfo/Search?format=json',
+      'POST',
+      { username: device.username, password },
+      JSON.stringify({ UserInfoSearchCond: { searchID: 'local', searchResultPosition: 0, maxResults: 100 } })
+    );
+
+    if (!response.ok) {
+      throw new Error(`No se pudo consultar usuarios: HTTP ${response.status}`);
+    }
+
+    const body = await response.text();
+    const json = JSON.parse(body);
+    const users = json?.UserInfoSearch?.UserInfo ?? [];
+
+    return users.map((entry: any) => ({
+      employeeNo: String(entry.employeeNo ?? entry.employeeNoString ?? ''),
+      name: entry.name,
+      cardNo: entry.cardNo
+    })).filter((entry: DeviceDirectoryUser) => entry.employeeNo);
+  }
+
+  async fetchDeviceAccessLogs(deviceId: string): Promise<DeviceAccessLog[]> {
+    const { device, password, baseUrl } = await this.getDeviceWithPassword(deviceId);
+    const response = await isapiRequest(baseUrl, '/ISAPI/AccessControl/AcsEvent?format=json', 'GET', {
+      username: device.username,
+      password
+    });
+
+    if (!response.ok) {
+      throw new Error(`No se pudo consultar accesos: HTTP ${response.status}`);
+    }
+
+    const body = await response.text();
+    const json = JSON.parse(body);
+    const infos = json?.AcsEvent?.InfoList ?? json?.AcsEvent?.Info ?? [];
+    const rows = Array.isArray(infos) ? infos : [infos];
+
+    return rows.map((entry: any) => ({
+      timestamp: entry?.time,
+      eventType: entry?.majorEventType ?? entry?.minorEventType ?? entry?.eventType,
+      employeeNo: entry?.employeeNoString ? String(entry.employeeNoString) : undefined,
+      name: entry?.name,
+      verifyMode: entry?.currentVerifyMode,
+      doorNo: Number(entry?.doorNo) || undefined,
+      direction: entry?.entryDirection,
+      raw: entry
+    }));
+  }
+
+  private async getDeviceWithPassword(deviceId: string) {
+    const device = this.db.listDevices().find((entry) => entry.id === deviceId);
+    if (!device) throw new Error('Device not found');
+    const password = await getDevicePassword(deviceId);
+    if (!password) throw new Error('Missing password');
+    const baseUrl = `${device.protocol}://${device.ip}:${device.port}`;
+    return { device, password, baseUrl };
   }
 
   private async startDevice(device: DeviceConfig) {

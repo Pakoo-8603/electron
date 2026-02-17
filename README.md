@@ -93,3 +93,17 @@ Genera eventos mock cada segundo para validar pipeline completo sin hardware fí
 - **No llegan eventos en stream**: revisar firewall LAN y timeout heartbeat.
 - **Push no entra**: abrir puerto `listenerPort` en firewall local.
 - **SQLite locked**: validar permisos de escritura en `userData`.
+
+## Semáforo de salud (UI)
+
+- **Verde**: dispositivos conectados y cola local bajo control.
+- **Naranja**: estado de advertencia (p. ej. sin dispositivos aún, o alguno desconectado/reintentando).
+- **Rojo**: cola local elevada, suele indicar problema sostenido de salida/sincronización.
+
+## Consumo local desde dispositivo (sin backend)
+
+Se agregó una pantalla **Datos del dispositivo** para priorizar operación local:
+- Consultar usuarios/empleados del equipo por ISAPI (`/ISAPI/AccessControl/UserInfo/Search?format=json`).
+- Consultar accesos del equipo por ISAPI (`/ISAPI/AccessControl/AcsEvent?format=json`).
+
+Esto permite validar extracción de datos directamente del dispositivo antes de cerrar la integración con nube.

@@ -1,4 +1,11 @@
-import type { DeviceConfig, DeviceStatus, GatewaySettings, NormalizedEvent } from '../shared/types.js';
+import type {
+  DeviceAccessLog,
+  DeviceConfig,
+  DeviceDirectoryUser,
+  DeviceStatus,
+  GatewaySettings,
+  NormalizedEvent
+} from '../shared/types.js';
 
 type DeviceInput = Omit<DeviceConfig, 'id' | 'createdAt' | 'updatedAt'> & { id?: string; password?: string };
 
@@ -15,6 +22,8 @@ export interface GatewayApi {
   getState: () => Promise<GatewayState>;
   upsertDevice: (device: DeviceInput) => Promise<DeviceConfig>;
   testDevice: (deviceId: string) => Promise<{ ok: boolean; status: number; body: string }>;
+  getDeviceUsers: (deviceId: string) => Promise<DeviceDirectoryUser[]>;
+  getDeviceAccessLogs: (deviceId: string) => Promise<DeviceAccessLog[]>;
 }
 
 const defaultState: GatewayState = {
@@ -64,6 +73,12 @@ const createMockGatewayApi = (): GatewayApi => ({
   },
   async testDevice() {
     return { ok: false, status: 503, body: 'No disponible en mock navegador.' };
+  },
+  async getDeviceUsers() {
+    return [];
+  },
+  async getDeviceAccessLogs() {
+    return [];
   }
 });
 

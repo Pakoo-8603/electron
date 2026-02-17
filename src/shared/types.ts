@@ -69,3 +69,20 @@ export interface GatewayHealth {
   reconnections: number;
   lastSyncAt?: string;
 }
+
+export interface DeviceDirectoryUser {
+  employeeNo: string;
+  name?: string;
+  cardNo?: string;
+}
+
+export interface DeviceAccessLog {
+  timestamp?: string;
+  eventType?: string;
+  employeeNo?: string;
+  name?: string;
+  verifyMode?: string;
+  doorNo?: number;
+  direction?: string;
+  raw: unknown;
+}

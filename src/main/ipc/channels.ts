@@ -15,4 +15,6 @@ export const registerIpc = (manager: DeviceManager, db: GatewayDatabase, getSett
 
   ipcMain.handle('gateway:upsert-device', async (_, device) => manager.upsertDevice(device));
   ipcMain.handle('gateway:test-device', async (_, deviceId: string) => manager.testConnection(deviceId));
+  ipcMain.handle('gateway:get-device-users', async (_, deviceId: string) => manager.fetchDeviceUsers(deviceId));
+  ipcMain.handle('gateway:get-device-access-logs', async (_, deviceId: string) => manager.fetchDeviceAccessLogs(deviceId));
 };

@@ -39,9 +39,11 @@ export const isapiRequest = async (
   body?: string
 ): Promise<Response> => {
   const url = `${baseUrl}${endpoint}`;
+  const contentType = body?.trim().startsWith('{') ? 'application/json' : 'application/xml';
+
   let response = await fetch(url, {
     method,
-    headers: { Authorization: basicAuth(credentials.username, credentials.password), 'Content-Type': 'application/xml' },
+    headers: { Authorization: basicAuth(credentials.username, credentials.password), 'Content-Type': contentType },
     body
   });
 
@@ -51,7 +53,7 @@ export const isapiRequest = async (
     if (digest) {
       response = await fetch(url, {
         method,
-        headers: { Authorization: digest, 'Content-Type': 'application/xml' },
+        headers: { Authorization: digest, 'Content-Type': contentType },
         body
       });
     }

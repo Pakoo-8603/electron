@@ -3,5 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('gatewayApi', {
   getState: () => ipcRenderer.invoke('gateway:get-state'),
   upsertDevice: (device: unknown) => ipcRenderer.invoke('gateway:upsert-device', device),
-  testDevice: (deviceId: string) => ipcRenderer.invoke('gateway:test-device', deviceId)
+  testDevice: (deviceId: string) => ipcRenderer.invoke('gateway:test-device', deviceId),
+  getDeviceUsers: (deviceId: string) => ipcRenderer.invoke('gateway:get-device-users', deviceId),
+  getDeviceAccessLogs: (deviceId: string) => ipcRenderer.invoke('gateway:get-device-access-logs', deviceId)
 });
