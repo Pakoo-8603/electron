@@ -1,0 +1,50 @@
+{
+  "name": "hikvision-gateway-electron",
+  "version": "0.1.0",
+  "description": "Gateway ligero Electron/TypeScript para integración Hikvision ISAPI",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm:dev:main\" \"npm:dev:renderer\" \"npm:dev:electron\"",
+    "dev:main": "tsc -p tsconfig.main.json --watch",
+    "dev:renderer": "vite",
+    "dev:electron": "wait-on dist/main/index.js tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
+    "build": "npm run build:shared && npm run build:main && npm run build:renderer",
+    "build:shared": "tsc -p tsconfig.shared.json",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
+    "simulate:events": "tsx scripts/simulate-events.ts"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "electron-store": "^10.0.1",
+    "fast-xml-parser": "^4.5.1",
+    "fastify": "^5.2.1",
+    "keytar": "^7.9.0",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "undici": "^7.4.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.13.4",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^34.2.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0",
+    "vitest": "^3.0.5",
+    "wait-on": "^8.0.2"
+  }
+}
