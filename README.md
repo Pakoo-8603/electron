@@ -97,6 +97,23 @@ npm install
 
 Asegúrate de estar en Node 20/22 LTS.
 
+
+### Diagnóstico rápido de entorno
+
+Ejecuta:
+
+```bash
+npm run doctor
+```
+
+Este comando valida:
+- versión de Node
+- variables de proxy activas
+- conectividad al registry
+- si tu red bloquea paquetes scopeados (ej. `@types/express`)
+
+Si ves `403` en paquetes `@scope/name`, el problema es de red/proxy corporativo (no del código).
+
 ### `concurrently: command not found`
 Ocurre cuando `npm install` no terminó. Corrige instalación y vuelve a correr `npm run dev`.
 

@@ -20,7 +20,8 @@
     "test:watch": "vitest",
     "simulate": "tsx src/main/mock/simulator.ts",
     "lint": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json",
-    "package": "electron-builder"
+    "package": "electron-builder",
+    "doctor": "node ./scripts/doctor.cjs"
   },
   "build": {
     "appId": "com.example.hikvisiongateway",
