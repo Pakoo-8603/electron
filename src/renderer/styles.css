@@ -1,0 +1,22 @@
+body { margin: 0; font-family: Arial, sans-serif; }
+.layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+aside { background: #121826; color: white; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+button { padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background: #fff; cursor: pointer; }
+aside button { text-align: left; }
+button.active { background: #304ffe; color: #fff; }
+main { padding: 20px; }
+form { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 8px; margin-bottom: 16px; }
+input, select { padding: 8px; }
+.health { width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.health.green { background: #2e7d32; }
+.health.orange { background: #f9a825; }
+.health.red { background: #c62828; }
+.health.gray { background: gray; }
+table { width: 100%; border-collapse: collapse; }
+th, td { border-bottom: 1px solid #ddd; padding: 6px; text-align: left; }
+
+.warning-banner { background: #fff3cd; color: #664d03; border: 1px solid #ffecb5; padding: 10px; border-radius: 6px; margin-bottom: 12px; }
+.error-banner { background: #f8d7da; color: #842029; border: 1px solid #f5c2c7; padding: 10px; border-radius: 6px; margin-bottom: 12px; }
+
+.device-tools { display: flex; gap: 8px; margin-bottom: 12px; }
+small { color: #d0d7e2; margin-bottom: 8px; display: block; }
