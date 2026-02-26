@@ -32,6 +32,14 @@ const state: {
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('No se encontró #app');
 
+
+function getBridge() {
+  if (!window.hikvisionGateway) {
+    throw new Error('Bridge IPC no disponible. Ejecuta la UI dentro de Electron con `npm run dev`, no solo en el navegador.');
+  }
+  return window.hikvisionGateway;
+}
+
 function addLog(log: RequestLog) {
   state.logs.unshift(log);
   state.logs = state.logs.slice(0, 40);
@@ -63,14 +71,14 @@ async function withLoading<T>(fn: () => Promise<T>) {
 }
 
 async function loadConfig() {
-  const resp = await window.hikvisionGateway.getConfig();
+  const resp = await getBridge().getConfig();
   state.config = resp.config ?? defaultConfig;
   state.hasStoredPassword = resp.hasStoredPassword;
   render();
 }
 
 async function saveConfig() {
-  const resp = await window.hikvisionGateway.saveConfig({
+  const resp = await getBridge().saveConfig({
     config: state.config,
     password: state.password || undefined
   });
@@ -81,7 +89,7 @@ async function saveConfig() {
 async function onTestConnection() {
   await withLoading(async () => {
     await saveConfig();
-    const response = await window.hikvisionGateway.testConnection({
+    const response = await getBridge().testConnection({
       config: state.config,
       password: state.password || undefined
     });
@@ -94,7 +102,7 @@ async function onTestConnection() {
 async function onListUsers() {
   await withLoading(async () => {
     await saveConfig();
-    const response = await window.hikvisionGateway.listUsers({
+    const response = await getBridge().listUsers({
       config: state.config,
       password: state.password || undefined,
       search: { searchResultPosition: 0, maxResults: 30, fuzzySearch: '' }
@@ -107,7 +115,7 @@ async function onListUsers() {
 
 async function onProbe() {
   await withLoading(async () => {
-    const response = await window.hikvisionGateway.probe({
+    const response = await getBridge().probe({
       host: state.config.host,
       username: state.config.username,
       password: state.password,
@@ -174,5 +182,11 @@ function render() {
   document.getElementById('probe')?.addEventListener('click', () => void onProbe());
 }
 
-void loadConfig();
 render();
+void loadConfig().catch((error) => {
+  state.result = {
+    error: error instanceof Error ? error.message : String(error),
+    hint: 'Si abriste http://localhost:5173 directamente, usa `npm run dev` para levantar Electron + preload.'
+  };
+  render();
+});
