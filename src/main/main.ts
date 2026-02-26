@@ -2,14 +2,14 @@ import path from 'node:path';
 import { app, BrowserWindow } from 'electron';
 import { registerIpcHandlers } from './ipc';
 import { SyncService } from './sync-service';
-import { getConfig, getStoredPassword, getSyncSettings } from './store';
+import { getDevices, getSelectedDeviceId, getStoredPassword, getSyncSettings } from './store';
 
 const syncService = new SyncService();
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1100,
-    height: 760,
+    width: 1300,
+    height: 820,
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
@@ -28,10 +28,13 @@ function createWindow() {
 app.whenReady().then(async () => {
   registerIpcHandlers();
 
-  const config = getConfig();
+  const devices = getDevices();
+  const selectedId = getSelectedDeviceId();
+  const selectedDevice = devices.find((item) => item.id === selectedId) ?? devices[0];
   const syncSettings = getSyncSettings();
-  const password = await getStoredPassword();
-  syncService.start(config, password, syncSettings);
+  const password = await getStoredPassword(selectedDevice.id);
+
+  syncService.start(selectedDevice.config, password, syncSettings);
 
   createWindow();
 

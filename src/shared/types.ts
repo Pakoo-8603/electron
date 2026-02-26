@@ -10,6 +10,12 @@ export interface GatewayConfig {
   timeoutMs: number;
 }
 
+export interface ManagedDevice {
+  id: string;
+  name: string;
+  config: GatewayConfig;
+}
+
 export interface SearchUsersPayload {
   searchResultPosition: number;
   maxResults: number;

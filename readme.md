@@ -6,11 +6,12 @@ Aplicación Electron + TypeScript para operar como gateway local en LAN con disp
 Se eligió `digest-fetch` porque implementa **HTTP Digest Authentication** de forma sencilla sobre `fetch`, permitiendo reutilizar una capa común para `GET` y `POST` y mantener el código del cliente Hikvision pequeño y extensible.
 
 ## Características fase 1
-- UI con host/IP, puerto, protocolo, usuario/password, TLS insecure, timeout, recordar password.
+- UI con gestión de múltiples dispositivos (agregar, seleccionar, eliminar) y configuración por dispositivo: host/IP, puerto, protocolo, usuario/password, TLS insecure, timeout, recordar password.
 - Botones:
   - **Probar conexión**: `GET /ISAPI/System/deviceInfo`
   - **Listar usuarios**: `POST /ISAPI/AccessControl/UserInfo/Search?format=json`
   - **Detectar** (extra): prueba combinaciones `https:443`, `http:80`, `https:80`, `http:443`.
+- Vista amigable de usuarios (tabla) con paginación básica (`searchResultPosition`, `maxResults`) y filtro `fuzzySearch`.
 - Requests ejecutados desde **main process** usando IPC seguro (`contextIsolation: true`, `nodeIntegration: false`).
 - Parseo XML → JSON con `fast-xml-parser` cuando `deviceInfo` no regresa JSON.
 - Persistencia con `electron-store` (sin password por defecto).

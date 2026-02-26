@@ -1,13 +1,16 @@
-import type { GatewayConfig, SearchUsersPayload } from '../shared/types';
+import type { ManagedDevice, SearchUsersPayload } from '../shared/types';
 
 declare global {
   interface Window {
     hikvisionGateway: {
-      getConfig: () => Promise<{ config: GatewayConfig; hasStoredPassword: boolean }>;
-      saveConfig: (payload: { config: GatewayConfig; password?: string }) => Promise<{ ok: boolean; keytarAvailable: boolean }>;
-      testConnection: (payload: { config: GatewayConfig; password?: string }) => Promise<any>;
-      listUsers: (payload: { config: GatewayConfig; password?: string; search: SearchUsersPayload }) => Promise<any>;
-      probe: (payload: { host: string; username: string; password: string; tlsInsecure: boolean }) => Promise<any>;
+      getState: () => Promise<{ devices: ManagedDevice[]; selectedDeviceId: string; hasStoredPasswordByDevice: Record<string, boolean> }>;
+      createDevice: () => Promise<{ device: ManagedDevice; devices: ManagedDevice[] }>;
+      saveDevice: (payload: { device: ManagedDevice; password?: string }) => Promise<{ ok: boolean; keytarAvailable: boolean }>;
+      deleteDevice: (payload: { deviceId: string }) => Promise<{ ok: boolean; devices?: ManagedDevice[]; selectedDeviceId?: string; message?: string }>;
+      selectDevice: (payload: { deviceId: string }) => Promise<{ device: ManagedDevice; hasStoredPassword: boolean }>;
+      testConnection: (payload: { deviceId: string; password?: string }) => Promise<any>;
+      listUsers: (payload: { deviceId: string; password?: string; search: SearchUsersPayload }) => Promise<any>;
+      probe: (payload: { deviceId: string; password?: string }) => Promise<any>;
     };
   }
 }

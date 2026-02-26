@@ -1,24 +1,33 @@
 import Store from 'electron-store';
-import type { GatewayConfig, SyncSettings } from '../shared/types';
+import type { GatewayConfig, ManagedDevice, SyncSettings } from '../shared/types';
 
 const PASSWORD_SERVICE = 'electron-hikvision-gateway';
-const PASSWORD_ACCOUNT = 'hikvision-device-password';
 
 interface AppStoreSchema {
-  config: GatewayConfig;
+  devices: ManagedDevice[];
+  selectedDeviceId: string;
   sync: SyncSettings;
 }
 
+const defaultConfig: GatewayConfig = {
+  host: '',
+  port: 443,
+  protocol: 'https',
+  username: 'admin',
+  tlsInsecure: true,
+  rememberPassword: false,
+  timeoutMs: 8000
+};
+
+const defaultDevice: ManagedDevice = {
+  id: 'default-device',
+  name: 'Dispositivo principal',
+  config: defaultConfig
+};
+
 const defaults: AppStoreSchema = {
-  config: {
-    host: '',
-    port: 443,
-    protocol: 'https',
-    username: 'admin',
-    tlsInsecure: true,
-    rememberPassword: false,
-    timeoutMs: 8000
-  },
+  devices: [defaultDevice],
+  selectedDeviceId: defaultDevice.id,
   sync: {
     enabled: false,
     intervalMinutes: 15,
@@ -29,12 +38,27 @@ const defaults: AppStoreSchema = {
 
 const rawStore = new Store<AppStoreSchema>({ defaults }) as any;
 
-export function getConfig(): GatewayConfig {
-  return rawStore.get('config');
+function normalizeDevices(devices: ManagedDevice[]): ManagedDevice[] {
+  if (!devices || devices.length === 0) {
+    return [defaultDevice];
+  }
+  return devices;
 }
 
-export function setConfig(config: GatewayConfig): void {
-  rawStore.set('config', config);
+export function getDevices(): ManagedDevice[] {
+  return normalizeDevices(rawStore.get('devices'));
+}
+
+export function setDevices(devices: ManagedDevice[]): void {
+  rawStore.set('devices', normalizeDevices(devices));
+}
+
+export function getSelectedDeviceId(): string {
+  return rawStore.get('selectedDeviceId') || defaultDevice.id;
+}
+
+export function setSelectedDeviceId(selectedDeviceId: string): void {
+  rawStore.set('selectedDeviceId', selectedDeviceId);
 }
 
 export function getSyncSettings(): SyncSettings {
@@ -57,27 +81,31 @@ function getKeytar() {
   return keytarModule;
 }
 
+function passwordAccountForDevice(deviceId: string): string {
+  return `hikvision-device-password:${deviceId}`;
+}
+
 export function isKeytarAvailable(): boolean {
   return Boolean(getKeytar());
 }
 
-export async function getStoredPassword(): Promise<string> {
+export async function getStoredPassword(deviceId: string): Promise<string> {
   const keytar = getKeytar();
   if (!keytar) return '';
 
-  return (await keytar.getPassword(PASSWORD_SERVICE, PASSWORD_ACCOUNT)) ?? '';
+  return (await keytar.getPassword(PASSWORD_SERVICE, passwordAccountForDevice(deviceId))) ?? '';
 }
 
-export async function setStoredPassword(password: string): Promise<void> {
+export async function setStoredPassword(deviceId: string, password: string): Promise<void> {
   const keytar = getKeytar();
   if (!keytar) return;
 
-  await keytar.setPassword(PASSWORD_SERVICE, PASSWORD_ACCOUNT, password);
+  await keytar.setPassword(PASSWORD_SERVICE, passwordAccountForDevice(deviceId), password);
 }
 
-export async function clearStoredPassword(): Promise<void> {
+export async function clearStoredPassword(deviceId: string): Promise<void> {
   const keytar = getKeytar();
   if (!keytar) return;
 
-  await keytar.deletePassword(PASSWORD_SERVICE, PASSWORD_ACCOUNT);
+  await keytar.deletePassword(PASSWORD_SERVICE, passwordAccountForDevice(deviceId));
 }
